@@ -474,3 +474,4 @@ void full_stop(void){
 			TIM_OC2Init(TIM3,&outputChannelInit);
 }
 
+//testingtesting
