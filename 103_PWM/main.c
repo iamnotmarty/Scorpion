@@ -31,6 +31,12 @@
 #define distanceSensor_port 	GPIOA
 #define distanceSensor_pin		GPIO_Pin_1
 
+#define leftencoder_port	GPIOA
+#define leftencoder_pin		GPIO_Pin_2
+
+#define rightencoder_port	GPIOA
+#define rightencoder_pin	GPIO_Pin_3
+
 //Functions
 static void GPIO_initialize(void);
 static void TIM_initialize(void);
@@ -42,7 +48,7 @@ static void RCC_initialize(void);
 static void sensor_init(void);
 static void motor_init(void);
 
-uint16_t distance_voltage(uint8_t);
+float analog_voltage(uint8_t);
 static void full_stop(void);
 
 
@@ -104,18 +110,18 @@ int main(void) {
 	motor_init();
 	
 
-	/*
+	
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	*/
+	
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	
-		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
@@ -152,9 +158,9 @@ int main(void) {
 		GPIO_ResetBits(motorR2_port,motorR2_pin);	
 		
 		
-		distance = 27/distance_voltage(1);
+		distance = 27/analog_voltage(1);
 		
-		if (distance_voltage(1) > 2850){
+		if (analog_voltage(1) > 2.3){
 			full_stop();
 		
 		} else {
@@ -164,6 +170,16 @@ int main(void) {
 			outputChannelInit.TIM_Pulse = CCR2_Val;
 			TIM_OC2Init(TIM3,&outputChannelInit);
 					
+		}
+		
+		
+		
+		if (analog_voltage(3) > 1.5){
+			GPIO_SetBits(GPIOB, GPIO_Pin_5);
+		
+		} else {
+		
+			GPIO_ResetBits(GPIOB, GPIO_Pin_5);
 		}
 		
 		
@@ -325,7 +341,7 @@ void ADC_initialize(void){
   ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
 	
   /* Say how many channels would be used by the sequencer */
-  ADC_InitStructure.ADC_NbrOfChannel = 1;
+  ADC_InitStructure.ADC_NbrOfChannel = 3;
 
   /* Now do the setup */
   ADC_Init(ADC1, &ADC_InitStructure);
@@ -363,6 +379,19 @@ void sensor_init(void){
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;	
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
 	GPIO_Init(distanceSensor_port, &GPIO_InitStructure);
+	
+	// Analog input left encoder
+	GPIO_InitStructure.GPIO_Pin = leftencoder_pin;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(leftencoder_port, &GPIO_InitStructure);
+		
+	// Analog input right encoder
+	GPIO_InitStructure.GPIO_Pin = rightencoder_pin;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(rightencoder_port, &GPIO_InitStructure);
+	
 	
 }
 
@@ -450,7 +479,7 @@ void TIM4_IRQHandler(void)
 
 
 
-uint16_t distance_voltage (uint8_t channel){
+float analog_voltage (uint8_t channel){
 
 	ADC_RegularChannelConfig(ADC1, channel, 1, ADC_SampleTime_7Cycles5);
   // Start the conversion
@@ -458,8 +487,11 @@ uint16_t distance_voltage (uint8_t channel){
   // Wait until conversion completion
   while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
 
-
-	return ADC_GetConversionValue(ADC1);
+	// Convert 12 bit ADC value to voltage between 0-3.3v
+	// 4096/3.3 = 1241
+	return (ADC_GetConversionValue(ADC1)/1241);
+	
+	
 }
 
 
@@ -474,4 +506,3 @@ void full_stop(void){
 			TIM_OC2Init(TIM3,&outputChannelInit);
 }
 
-//testingtesting
