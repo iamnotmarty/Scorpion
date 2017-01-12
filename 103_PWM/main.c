@@ -31,20 +31,31 @@
 #define distanceSensor_port 	GPIOA
 #define distanceSensor_pin		GPIO_Pin_1
 
-//Functions
+#define leftencoder_port	GPIOA
+#define leftencoder_pin		GPIO_Pin_2
+
+#define rightencoder_port	GPIOA
+#define rightencoder_pin	GPIO_Pin_3
+
+//Initialization functions
 static void GPIO_initialize(void);
 static void TIM_initialize(void);
 static void ADC_initialize(void);
 static void Motor_PWM_initialize(void);
 static void NVIC_Configuration(void);
 static void RCC_initialize(void);
-
 static void sensor_init(void);
 static void motor_init(void);
 
-uint16_t distance_voltage(uint8_t);
-static void full_stop(void);
+//Sensor value acquisition functions
+float analog_voltage(uint8_t);
 
+//Robot movement functions 
+static void full_stop(void);
+static void forward(void);
+static void backward(void);
+static void stationary_left(void);
+static void stationary_right(void);
 
 
 //Type Define
@@ -57,17 +68,18 @@ TIM_OCInitTypeDef outputChannelInit = {0,};
 //Variables
 uint16_t CCR1_Val = 45;
 uint16_t CCR2_Val = 80;
-uint16_t CCR3_Val = 50;
-uint16_t CCR4_Val = 25;
+
 uint16_t PrescalerValue = 0;
 
 uint8_t sensorL = 0;
 uint8_t sensorR = 0;
 float distance = 0;
 
+uint16_t left_EncoderCount = 0;
+uint16_t right_EncoderCounter = 0;
+uint8_t timer_flag = 0;
+
 uint8_t counter = 0;
-uint8_t counter1 = 0;
-uint8_t counter5 = 0;
 
 
 /*APB1 -> 36MHz
@@ -96,31 +108,9 @@ uint8_t counter5 = 0;
 
 int main(void) {
 	
-	RCC_initialize();	
-	
+	RCC_initialize();		
 	sensor_init();
-
-
 	motor_init();
-	
-
-	/*
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	*/
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	
-		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	
-	
 	NVIC_Configuration();	
 	TIM_initialize();
 	Motor_PWM_initialize();
@@ -142,54 +132,92 @@ int main(void) {
 	// Start Timer 4 interrupt
 	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
 	
+	
+	// Initialize misc GPIO pins
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	
+	
+	
+	
 	// LOOOOOOOOP
 	while(1) {
-		
-		GPIO_SetBits(motorL1_port,motorL1_pin);
-		GPIO_ResetBits(motorL2_port,motorL2_pin);
-		
-		GPIO_SetBits(motorR1_port,motorR1_pin);
-		GPIO_ResetBits(motorR2_port,motorR2_pin);	
-		
-		
-		distance = 27/distance_voltage(1);
-		
-		if (distance_voltage(1) > 2850){
-			full_stop();
-		
-		} else {
-			
-			outputChannelInit.TIM_Pulse = CCR1_Val;
-			TIM_OC1Init(TIM3,&outputChannelInit);			
-			outputChannelInit.TIM_Pulse = CCR2_Val;
-			TIM_OC2Init(TIM3,&outputChannelInit);
-					
-		}
-		
+	
+		/* Get all sensor values */
+//-----------------------------------------------------------------		
+		distance = 27/analog_voltage(1);
 		
 		// 0 = obstacle
 		// 1 = unblocked
 		sensorL = GPIO_ReadInputDataBit(sensorL_port, sensorL_pin);
 		sensorR = GPIO_ReadInputDataBit(sensorR_port, sensorR_pin);
+//-----------------------------------------------------------------
 		
+		
+		
+		/*Robot action*/
+//------------------------------------------------------------------		
+		// If no obstacles, move forward
+		if ((distance >= 7)&&(sensorL==1)&&(sensorR==1)){
+			forward();
 
-		
-		/*
-		if (sensorR == 0) {			
-			full_stop();
-			
-		} else if (sensorR ==1){
-			outputChannelInit.TIM_Pulse = CCR1_Val;
-			TIM_OC1Init(TIM3,&outputChannelInit);			
-			outputChannelInit.TIM_Pulse = CCR2_Val;
-			TIM_OC2Init(TIM3,&outputChannelInit);
-			
-		} else {			
-			full_stop();
+		// If distance sensor blocked, turn right
 		}
-	
-		*/
+		else if((distance < 7)&&(sensorL==1)&&(sensorR==1)){
+			stationary_right();
+		// If left sensor blocked, turn right
+		}
+		else if((distance >= 7)&&(sensorL==0)&&(sensorR==1)){
+			stationary_right();
+
+		// If right sensor blocked, turn left
+		}
+		else if((distance >= 7)&&(sensorL==1)&&(sensorR==0)){
+			stationary_left();
+		// If distance + left sensor blocked, turn right
+		}
+		else if((distance < 7)&&(sensorL==0)&&(sensorR==1)){
+			stationary_right();
+		// If distance + right sensor blocked, turn left
+		}
+		else if((distance < 7)&&(sensorL==1)&&(sensorR==0)){
+			stationary_left();
+		// If only left and right sensor blocked, turn right
+		}
+		else if((distance >= 7)&&(sensorL==0)&&(sensorR==0)){
+			stationary_right();
+		// If all blocked, turn right
+		}
+		else if((distance < 7)&&(sensorL==0)&&(sensorR==0)){
+			stationary_right();		
+		}
+		else{
 		
+		}
+//------------------------------------------------------------
+				
+		
+/*Encoder counter*/
+		
+		if (analog_voltage(3) > 1.5){
+			GPIO_SetBits(GPIOB, GPIO_Pin_5);
+		
+		} else {
+		
+			GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+		}
 
   }		
 }
@@ -209,7 +237,7 @@ void TIM_initialize(void){
 	// Initialize Timer 2
 	timerInitStructure.TIM_Prescaler = 7200;
   timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-  timerInitStructure.TIM_Period = 100;
+  timerInitStructure.TIM_Period = 5000;
   timerInitStructure.TIM_ClockDivision = 0;
   timerInitStructure.TIM_RepetitionCounter = 0;
   TIM_TimeBaseInit(TIM2, &timerInitStructure);
@@ -325,7 +353,7 @@ void ADC_initialize(void){
   ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
 	
   /* Say how many channels would be used by the sequencer */
-  ADC_InitStructure.ADC_NbrOfChannel = 1;
+  ADC_InitStructure.ADC_NbrOfChannel = 3;
 
   /* Now do the setup */
   ADC_Init(ADC1, &ADC_InitStructure);
@@ -363,6 +391,19 @@ void sensor_init(void){
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;	
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
 	GPIO_Init(distanceSensor_port, &GPIO_InitStructure);
+	
+	// Analog input left encoder
+	GPIO_InitStructure.GPIO_Pin = leftencoder_pin;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(leftencoder_port, &GPIO_InitStructure);
+		
+	// Analog input right encoder
+	GPIO_InitStructure.GPIO_Pin = rightencoder_pin;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;	
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;	
+	GPIO_Init(rightencoder_port, &GPIO_InitStructure);
+	
 	
 }
 
@@ -450,7 +491,7 @@ void TIM4_IRQHandler(void)
 
 
 
-uint16_t distance_voltage (uint8_t channel){
+float analog_voltage (uint8_t channel){
 
 	ADC_RegularChannelConfig(ADC1, channel, 1, ADC_SampleTime_7Cycles5);
   // Start the conversion
@@ -458,8 +499,11 @@ uint16_t distance_voltage (uint8_t channel){
   // Wait until conversion completion
   while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
 
-
-	return ADC_GetConversionValue(ADC1);
+	// Convert 12 bit ADC value to voltage between 0-3.3v
+	// 4096/3.3 = 1241
+	return (ADC_GetConversionValue(ADC1)/1241);
+	
+	
 }
 
 
@@ -474,4 +518,79 @@ void full_stop(void){
 			TIM_OC2Init(TIM3,&outputChannelInit);
 }
 
-//testingtesting
+void forward(void){
+	
+		// Set forward state motor controller pins
+		GPIO_SetBits(motorL1_port,motorL1_pin);
+		GPIO_ResetBits(motorL2_port,motorL2_pin);
+		
+		GPIO_SetBits(motorR1_port,motorR1_pin);
+		GPIO_ResetBits(motorR2_port,motorR2_pin);
+	
+					// Left enable pulse = 0
+			outputChannelInit.TIM_Pulse = 50;
+			TIM_OC1Init(TIM3,&outputChannelInit);
+			
+			// Right enable pulse = 0
+			outputChannelInit.TIM_Pulse = 80;
+			TIM_OC2Init(TIM3,&outputChannelInit);
+}
+
+
+
+void backward(void){
+	
+		// Set forward state motor controller pins
+		GPIO_ResetBits(motorL1_port,motorL1_pin);
+		GPIO_SetBits(motorL2_port,motorL2_pin);
+		
+		GPIO_ResetBits(motorR1_port,motorR1_pin);
+		GPIO_SetBits(motorR2_port,motorR2_pin);
+	
+					// Left enable pulse = 0
+			outputChannelInit.TIM_Pulse = 50;
+			TIM_OC1Init(TIM3,&outputChannelInit);
+			
+			// Right enable pulse = 0
+			outputChannelInit.TIM_Pulse = 80;
+			TIM_OC2Init(TIM3,&outputChannelInit);
+}
+
+void stationary_left(void){
+	// Set backward state for left motor 
+		GPIO_ResetBits(motorL1_port,motorL1_pin);
+		GPIO_SetBits(motorL2_port,motorL2_pin);
+		
+	// Set forward state for right motor
+		GPIO_SetBits(motorR1_port,motorR1_pin);
+		GPIO_ResetBits(motorR2_port,motorR2_pin);
+	
+					// Left enable pulse = 0
+			outputChannelInit.TIM_Pulse = 50;
+			TIM_OC1Init(TIM3,&outputChannelInit);
+			
+			// Right enable pulse = 0
+			outputChannelInit.TIM_Pulse = 80;
+			TIM_OC2Init(TIM3,&outputChannelInit);
+
+}
+
+void stationary_right(void){
+	// Set forward state for left motor 
+		GPIO_SetBits(motorL1_port,motorL1_pin);
+		GPIO_ResetBits(motorL2_port,motorL2_pin);
+		
+	// Set backward state for right motor
+		GPIO_ResetBits(motorR1_port,motorR1_pin);
+		GPIO_SetBits(motorR2_port,motorR2_pin);
+	
+					// Left enable pulse = 0
+			outputChannelInit.TIM_Pulse = 50;
+			TIM_OC1Init(TIM3,&outputChannelInit);
+			
+			// Right enable pulse = 0
+			outputChannelInit.TIM_Pulse = 80;
+			TIM_OC2Init(TIM3,&outputChannelInit);
+
+}
+

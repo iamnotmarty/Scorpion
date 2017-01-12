@@ -477,15 +477,16 @@ ARM Macro Assembler    Page 8
               00000000 
 Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M3 --apcs=interw
 ork --depend=.\objects\startup_stm32f10x_md.d -o.\objects\startup_stm32f10x_md.
-o -IC:\Users\Martin\Desktop\Projects\103_PWM\RTE -IC:\Users\Martin\Desktop\Proj
-ects\103_PWM\RTE\Device\STM32F103C8 -ID:\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.0-Beta4
-\CMSIS\Driver\Include -ID:\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.0-Beta4\CMSIS\Include
- -ID:\Keil_v5\ARM\PACK\Keil\MDK-Middleware\7.1.0\Board -ID:\Keil_v5\ARM\PACK\Ke
-il\STM32F1xx_DFP\2.1.0\Device\Include -ID:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\
-2.1.0\Device\StdPeriph_Driver\inc -ID:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.1.
-0\RTE_Driver --predefine="__EVAL SETA 1" --predefine="__UVISION_VERSION SETA 51
-7" --predefine="_RTE_ SETA 1" --predefine="STM32F10X_MD SETA 1" --list=.\listin
-gs\startup_stm32f10x_md.lst RTE\Device\STM32F103C8\startup_stm32f10x_md.s
+o -IC:\Users\Martin\Desktop\Projects\Scorpion\103_PWM\RTE -IC:\Users\Martin\Des
+ktop\Projects\Scorpion\103_PWM\RTE\Device\STM32F103C8 -ID:\Keil_v5\ARM\PACK\ARM
+\CMSIS\5.0.0-Beta4\CMSIS\Driver\Include -ID:\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.0-B
+eta4\CMSIS\Include -ID:\Keil_v5\ARM\PACK\Keil\MDK-Middleware\7.1.0\Board -ID:\K
+eil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.1.0\Device\Include -ID:\Keil_v5\ARM\PACK\K
+eil\STM32F1xx_DFP\2.1.0\Device\StdPeriph_Driver\inc -ID:\Keil_v5\ARM\PACK\Keil\
+STM32F1xx_DFP\2.1.0\RTE_Driver --predefine="__EVAL SETA 1" --predefine="__UVISI
+ON_VERSION SETA 517" --predefine="_RTE_ SETA 1" --predefine="STM32F10X_MD SETA 
+1" --list=.\listings\startup_stm32f10x_md.lst RTE\Device\STM32F103C8\startup_st
+m32f10x_md.s
 
 
 
